@@ -2,8 +2,10 @@ import SwiftUI
 import UIKit
 
 struct WelcomePage: View {
-    @State private var selectedCurrency: SupportedCurrency?
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @State private var showsCurrencyPicker = false
+    @State private var showsAddSubscriptionPage = false
+    @State private var showsFirstAddSubscriptionTitle = false
 
     var body: some View {
         ZStack {
@@ -76,16 +78,37 @@ struct WelcomePage: View {
             .padding(.bottom, 34)
         }
         .sheet(isPresented: $showsCurrencyPicker) {
-            CurrencyPickerSheet(selectedCurrency: $selectedCurrency)
+            CurrencyPickerSheet(selectedCurrency: currencyBinding)
                 .presentationDetents([.height(248)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
                 .presentationBackground(.thinMaterial)
         }
+        .fullScreenCover(isPresented: $showsAddSubscriptionPage) {
+            AddSubscriptionPage(showsFirstTimeTitle: showsFirstAddSubscriptionTitle)
+                .environmentObject(subscriptionStore)
+        }
+        .onChange(of: subscriptionStore.selectedCurrency) { _, newValue in
+            guard newValue != nil else { return }
+
+            showsFirstAddSubscriptionTitle = subscriptionStore.consumeFirstAddSubscriptionExperience()
+            showsAddSubscriptionPage = true
+        }
     }
 
     private var buttonTitle: String {
-        "Select Your Currency"
+        if let selectedCurrency = subscriptionStore.selectedCurrency {
+            return "Select Your Currency (\(selectedCurrency.symbol))"
+        }
+
+        return "Select Your Currency"
+    }
+
+    private var currencyBinding: Binding<SupportedCurrency?> {
+        Binding(
+            get: { subscriptionStore.selectedCurrency },
+            set: { subscriptionStore.selectedCurrency = $0 }
+        )
     }
 }
 
@@ -141,96 +164,6 @@ private struct CurrencyPickerSheet: View {
         .padding(.horizontal, 22)
         .padding(.top, 24)
         .padding(.bottom, 18)
-    }
-}
-
-private enum SupportedCurrency: String, CaseIterable, Identifiable {
-    case aud
-    case gbp
-    case cad
-    case cny
-    case eur
-    case jpy
-    case sgd
-    case thb
-    case usd
-    case vnd
-
-    var id: String { rawValue }
-
-    var name: String {
-        switch self {
-        case .aud:
-            return "Australian Dollar"
-        case .gbp:
-            return "British Pound Sterling"
-        case .cad:
-            return "Canadian Dollar"
-        case .cny:
-            return "Chinese Yuan"
-        case .eur:
-            return "Euro"
-        case .jpy:
-            return "Japanese Yen"
-        case .sgd:
-            return "Singapore Dollar"
-        case .thb:
-            return "Thai Baht"
-        case .usd:
-            return "US Dollar"
-        case .vnd:
-            return "Vietnamese Dong"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .aud:
-            return "A$"
-        case .gbp:
-            return "£"
-        case .cad:
-            return "C$"
-        case .cny:
-            return "¥"
-        case .eur:
-            return "€"
-        case .jpy:
-            return "¥"
-        case .sgd:
-            return "S$"
-        case .thb:
-            return "฿"
-        case .usd:
-            return "$"
-        case .vnd:
-            return "₫"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .aud:
-            return "AUD"
-        case .gbp:
-            return "GBP"
-        case .cad:
-            return "CAD"
-        case .cny:
-            return "CNY"
-        case .eur:
-            return "EUR"
-        case .jpy:
-            return "JPY"
-        case .sgd:
-            return "SGD"
-        case .thb:
-            return "THB"
-        case .usd:
-            return "USD"
-        case .vnd:
-            return "VND"
-        }
     }
 }
 

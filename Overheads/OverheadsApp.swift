@@ -9,9 +9,18 @@ import SwiftUI
 
 @main
 struct OverheadsApp: App {
+    @StateObject private var subscriptionStore = SubscriptionStore()
+
     var body: some Scene {
         WindowGroup {
-            WelcomePage()
+            Group {
+                if subscriptionStore.savedSubscriptions.isEmpty {
+                    WelcomePage()
+                } else {
+                    HomePage()
+                }
+            }
+            .environmentObject(subscriptionStore)
         }
     }
 }
