@@ -11,6 +11,7 @@ import UIKit
 struct HomePage: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @State private var showsAddSubscriptionPage = false
+    @State private var selectedSubscriptionToEdit: Subscription?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -72,6 +73,10 @@ struct HomePage: View {
             AddSubscriptionPage(showsFirstTimeTitle: false)
                 .environmentObject(subscriptionStore)
         }
+        .fullScreenCover(item: $selectedSubscriptionToEdit) { subscription in
+            AddSubscriptionPage(showsFirstTimeTitle: false, subscriptionToEdit: subscription)
+                .environmentObject(subscriptionStore)
+        }
     }
 
     private var currencySymbol: String {
@@ -102,7 +107,7 @@ struct HomePage: View {
     private var upcomingUnacknowledgedCount: Int {
         subscriptionStore.savedSubscriptions.filter { subscription in
             guard let nextChargeDate = subscription.nextChargeDate else { return false }
-            return DateUtils.isWithinNextSevenDays(nextChargeDate)
+            return DateUtils.isWithinNextSevenDays(nextChargeDate) && !subscription.isAcknowledged
         }.count
     }
 
@@ -116,7 +121,7 @@ struct HomePage: View {
                 .frame(height: 30)
 
             HStack(spacing: 10) {
-                Image(systemName: "xmark")
+                Image(systemName: acknowledgementSymbolName)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.black.opacity(0.78))
 
@@ -130,10 +135,7 @@ struct HomePage: View {
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.96, blue: 0.38),
-                                Color(red: 1.0, green: 0.93, blue: 0.28)
-                            ],
+                            colors: acknowledgementStatusColors,
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -143,7 +145,7 @@ struct HomePage: View {
                             .stroke(.white.opacity(0.52), lineWidth: 0.8)
                     }
                     .shadow(color: .white.opacity(0.42), radius: 8, y: -1)
-                    .shadow(color: .orange.opacity(0.22), radius: 24, y: 14)
+                    .shadow(color: acknowledgementStatusShadowColor, radius: 24, y: 14)
             }
 
             Spacer()
@@ -202,19 +204,64 @@ struct HomePage: View {
 
     private var subscriptionListSection: some View {
         VStack(spacing: 14) {
-            ForEach(subscriptionStore.savedSubscriptions) { subscription in
+            ForEach(sortedSavedSubscriptions) { subscription in
                 SubscriptionRowView(
                     subscription: subscription,
-                    isAcknowledged: false
+                    isAcknowledged: subscription.isAcknowledged,
+                    onAcknowledgementToggle: {
+                        subscriptionStore.toggleAcknowledgement(for: subscription.id)
+                    }
                 )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedSubscriptionToEdit = subscription
+                }
+            }
+        }
+    }
+
+    private var sortedSavedSubscriptions: [Subscription] {
+        subscriptionStore.savedSubscriptions.sorted { lhs, rhs in
+            switch (lhs.nextChargeDate, rhs.nextChargeDate) {
+            case let (lhsDate?, rhsDate?):
+                return lhsDate < rhsDate
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
         }
     }
 
     private var acknowledgementText: String {
         let count = upcomingUnacknowledgedCount
+        guard count > 0 else { return "Everything accounted for" }
         let itemLabel = count == 1 ? "item" : "items"
         return "\(count) \(itemLabel) not acknowledged"
+    }
+
+    private var acknowledgementSymbolName: String {
+        upcomingUnacknowledgedCount == 0 ? "checkmark" : "xmark"
+    }
+
+    private var acknowledgementStatusColors: [Color] {
+        if upcomingUnacknowledgedCount == 0 {
+            return [
+                Color(red: 0.60, green: 0.89, blue: 0.49),
+                Color(red: 0.44, green: 0.80, blue: 0.39)
+            ]
+        }
+
+        return [
+            Color(red: 1.0, green: 0.96, blue: 0.38),
+            Color(red: 1.0, green: 0.93, blue: 0.28)
+        ]
+    }
+
+    private var acknowledgementStatusShadowColor: Color {
+        upcomingUnacknowledgedCount == 0 ? .green.opacity(0.22) : .orange.opacity(0.22)
     }
 
     private func monthlyEquivalent(for amount: Double, frequency: Frequency) -> Double {
@@ -231,7 +278,11 @@ struct HomePage: View {
     }
 
     private func formattedAmount(_ amount: Double) -> String {
-        amount.formatted(.number.precision(.fractionLength(0...2)))
+        if subscriptionStore.selectedCurrency?.showsDecimalAmounts == false {
+            return amount.formatted(.number.precision(.fractionLength(0)))
+        }
+
+        return amount.formatted(.number.precision(.fractionLength(0...2)))
     }
 }
 

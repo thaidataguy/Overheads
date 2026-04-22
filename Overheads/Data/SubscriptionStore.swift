@@ -96,6 +96,15 @@ enum SupportedCurrency: String, CaseIterable, Identifiable {
             return "VND"
         }
     }
+
+    var showsDecimalAmounts: Bool {
+        switch self {
+        case .thb, .jpy, .cny, .vnd:
+            return false
+        default:
+            return true
+        }
+    }
 }
 
 @MainActor
@@ -132,6 +141,8 @@ final class SubscriptionStore: ObservableObject {
         } else {
             self.savedSubscriptions = []
         }
+
+        BillingNotificationScheduler.refreshNotifications(for: savedSubscriptions)
     }
 
     func setSelectedCurrency(_ currency: SupportedCurrency) {
@@ -146,12 +157,46 @@ final class SubscriptionStore: ObservableObject {
     ) {
         let subscription = Subscription(
             name: name,
+            icon: Subscription.iconName(for: name),
             amount: amount,
             frequency: frequency,
-            nextChargeDate: nextChargeDate
+            nextChargeDate: nextChargeDate,
+            isAcknowledged: false
         )
 
         savedSubscriptions.append(subscription)
+        BillingNotificationScheduler.refreshNotifications(for: savedSubscriptions)
+    }
+
+    func updateSubscription(
+        id: UUID,
+        name: String,
+        amount: Double,
+        frequency: Frequency,
+        nextChargeDate: Date
+    ) {
+        guard let index = savedSubscriptions.firstIndex(where: { $0.id == id }) else { return }
+
+        let previousNextChargeDate = savedSubscriptions[index].nextChargeDate
+        savedSubscriptions[index].name = name
+        savedSubscriptions[index].icon = Subscription.iconName(for: name)
+        savedSubscriptions[index].amount = amount
+        savedSubscriptions[index].frequency = frequency
+        savedSubscriptions[index].nextChargeDate = nextChargeDate
+        if previousNextChargeDate != nextChargeDate {
+            savedSubscriptions[index].isAcknowledged = false
+        }
+        BillingNotificationScheduler.refreshNotifications(for: savedSubscriptions)
+    }
+
+    func deleteSubscription(id: UUID) {
+        savedSubscriptions.removeAll { $0.id == id }
+        BillingNotificationScheduler.refreshNotifications(for: savedSubscriptions)
+    }
+
+    func toggleAcknowledgement(for id: UUID) {
+        guard let index = savedSubscriptions.firstIndex(where: { $0.id == id }) else { return }
+        savedSubscriptions[index].isAcknowledged.toggle()
     }
 
     func consumeFirstAddSubscriptionExperience() -> Bool {

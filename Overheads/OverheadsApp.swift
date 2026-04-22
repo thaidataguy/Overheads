@@ -21,6 +21,9 @@ struct OverheadsApp: App {
                 }
             }
             .environmentObject(subscriptionStore)
+            .task {
+                BillingNotificationScheduler.requestAuthorizationIfNeeded()
+            }
         }
     }
 }

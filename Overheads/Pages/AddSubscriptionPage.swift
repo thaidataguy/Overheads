@@ -16,16 +16,29 @@ struct AddSubscriptionPage: View {
     }
 
     let showsFirstTimeTitle: Bool
-    @State private var name = ""
+    let subscriptionToEdit: Subscription?
+    @State private var selectedRecurringPayment = ""
+    @State private var selectedCategory: Subscription.Category?
     @State private var amount = ""
     @State private var selectedFrequency: Frequency?
     @State private var nextChargeDate = Date()
     @State private var hasSelectedNextChargeDate = false
-    @State private var showsSubscriptionPicker = false
+    @State private var showsCategoryPicker = false
     @State private var showsFrequencyPicker = false
     @State private var showsNextChargeDatePicker = false
     @State private var showsIncompleteDataAlert = false
     @FocusState private var focusedField: Field?
+
+    init(showsFirstTimeTitle: Bool, subscriptionToEdit: Subscription? = nil) {
+        self.showsFirstTimeTitle = showsFirstTimeTitle
+        self.subscriptionToEdit = subscriptionToEdit
+        _selectedRecurringPayment = State(initialValue: subscriptionToEdit?.name ?? "")
+        _selectedCategory = State(initialValue: subscriptionToEdit.flatMap { Subscription.category(for: $0.name) })
+        _amount = State(initialValue: Self.formattedAmountText(for: subscriptionToEdit?.amount))
+        _selectedFrequency = State(initialValue: subscriptionToEdit?.frequency)
+        _nextChargeDate = State(initialValue: subscriptionToEdit?.nextChargeDate ?? Date())
+        _hasSelectedNextChargeDate = State(initialValue: subscriptionToEdit?.nextChargeDate != nil)
+    }
 
     var body: some View {
         ZStack {
@@ -37,7 +50,7 @@ struct AddSubscriptionPage: View {
                 }
 
             VStack(spacing: 0) {
-                Spacer(minLength: 140)
+                Spacer(minLength: 148)
 
                 Text(pageTitle)
                     .font(AddSubscriptionFont.title(34))
@@ -46,31 +59,15 @@ struct AddSubscriptionPage: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 28)
-
-                Button {
-                } label: {
-                    VStack(spacing: 10) {
-                        Circle()
-                            .fill(.white.opacity(0.96))
-                            .frame(width: 60, height: 60)
-
-                        Text("Upload icon")
-                            .font(AddSubscriptionFont.body(18))
-                            .foregroundStyle(Color.formPlaceholder)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Spacer(minLength: 22)
+                Spacer(minLength: 52)
 
                 VStack(spacing: 16) {
                     UnderlinePickerField(
-                        title: "Name",
-                        selectedValue: name,
+                        title: "Category",
+                        selectedValue: categoryFieldValue,
                         action: {
                             focusedField = nil
-                            showsSubscriptionPicker = true
+                            showsCategoryPicker = true
                         }
                     )
                     UnderlineInputField(title: "Amount", text: $amount, field: .amount, focusedField: $focusedField)
@@ -94,74 +91,19 @@ struct AddSubscriptionPage: View {
                 }
                 .padding(.horizontal, 38)
 
-                Spacer(minLength: 54)
+                Spacer(minLength: 72)
 
-                VStack(spacing: 6) {
-                    Text("This adds $9.99/month")
-                        .font(AddSubscriptionFont.body(18))
-                        .foregroundStyle(.black.opacity(0.88))
+                actionButtons
 
-                    Text("Your total becomes $1,210/month")
-                        .font(AddSubscriptionFont.body(18))
-                        .foregroundStyle(.black.opacity(0.88))
-                }
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: 84)
-                .background {
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(Color.summaryCard)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                                .stroke(.white.opacity(0.6), lineWidth: 0.8)
-                        }
-                        .shadow(color: .white.opacity(0.4), radius: 10, y: -1)
-                        .shadow(color: .black.opacity(0.08), radius: 22, y: 14)
-                }
-                .padding(.horizontal, 12)
-
-                Spacer(minLength: 28)
-
-                Button {
-                    confirmSubscription()
-                } label: {
-                    Text("Confirm")
-                        .font(AddSubscriptionFont.bodySemibold(18))
-                        .foregroundStyle(.black.opacity(0.92))
-                        .padding(.horizontal, 28)
-                        .frame(height: 46)
-                        .background {
-                            Capsule()
-                                .fill(.ultraThinMaterial)
-                                .overlay {
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [
-                                                    .white.opacity(0.55),
-                                                    .white.opacity(0.18)
-                                                ],
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            )
-                                        )
-                                        .blendMode(.screen)
-                                }
-                                .overlay {
-                                    Capsule()
-                                        .stroke(.white.opacity(0.65), lineWidth: 0.8)
-                                }
-                                .shadow(color: .white.opacity(0.45), radius: 8, y: -1)
-                                .shadow(color: .black.opacity(0.08), radius: 18, y: 10)
-                        }
-                }
-                .buttonStyle(.plain)
-
-                Spacer(minLength: 56)
+                Spacer(minLength: 148)
             }
             .padding(.horizontal, 20)
         }
-        .sheet(isPresented: $showsSubscriptionPicker) {
-            SubscriptionPickerSheet(selectedName: $name)
+        .sheet(isPresented: $showsCategoryPicker) {
+            CategoryPickerSheet(
+                selectedCategory: $selectedCategory,
+                selectedRecurringPayment: $selectedRecurringPayment
+            )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
@@ -179,7 +121,7 @@ struct AddSubscriptionPage: View {
                 selectedDate: $nextChargeDate,
                 hasSelectedDate: $hasSelectedNextChargeDate
             )
-            .presentationDetents([.height(360)])
+            .presentationDetents([.height(440)])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
             .presentationBackground(.thinMaterial)
@@ -202,6 +144,10 @@ struct AddSubscriptionPage: View {
     }
 
     private var pageTitle: String {
+        if subscriptionToEdit != nil {
+            return "Edit Recurring Payment"
+        }
+
         if showsFirstTimeTitle {
             return "Add Your First\nRecurring Payment"
         }
@@ -213,7 +159,7 @@ struct AddSubscriptionPage: View {
         focusedField = nil
 
         guard
-            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            !selectedRecurringPayment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             let parsedAmount = parsedAmount,
             let selectedFrequency,
             hasSelectedNextChargeDate
@@ -222,12 +168,29 @@ struct AddSubscriptionPage: View {
             return
         }
 
-        subscriptionStore.addSubscription(
-            name: name,
-            amount: parsedAmount,
-            frequency: selectedFrequency,
-            nextChargeDate: nextChargeDate
-        )
+        if let subscriptionToEdit {
+            subscriptionStore.updateSubscription(
+                id: subscriptionToEdit.id,
+                name: selectedRecurringPayment,
+                amount: parsedAmount,
+                frequency: selectedFrequency,
+                nextChargeDate: nextChargeDate
+            )
+        } else {
+            subscriptionStore.addSubscription(
+                name: selectedRecurringPayment,
+                amount: parsedAmount,
+                frequency: selectedFrequency,
+                nextChargeDate: nextChargeDate
+            )
+        }
+
+        dismiss()
+    }
+
+    private func deleteSubscription() {
+        guard let subscriptionToEdit else { return }
+        subscriptionStore.deleteSubscription(id: subscriptionToEdit.id)
         dismiss()
     }
 
@@ -237,6 +200,104 @@ struct AddSubscriptionPage: View {
 
         let normalizedAmount = trimmedAmount.replacingOccurrences(of: ",", with: "")
         return Double(normalizedAmount)
+    }
+
+    private var categoryFieldValue: String {
+        selectedRecurringPayment
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 14) {
+            if let subscriptionToEdit {
+                Button {
+                    deleteSubscription()
+                } label: {
+                    actionButtonLabel(
+                        title: "Delete",
+                        textColor: .white,
+                        fillColors: [
+                            Color(red: 0.89, green: 0.24, blue: 0.21).opacity(0.92),
+                            Color(red: 0.76, green: 0.16, blue: 0.16).opacity(0.84)
+                        ],
+                        strokeColor: .white.opacity(0.38),
+                        width: 138
+                    )
+                }
+                .buttonStyle(.plain)
+            } else if !showsFirstTimeTitle {
+                Button {
+                    dismiss()
+                } label: {
+                    actionButtonLabel(
+                        title: "Back",
+                        textColor: .black.opacity(0.82),
+                        fillColors: [
+                            .white.opacity(0.45),
+                            .white.opacity(0.16)
+                        ],
+                        strokeColor: .white.opacity(0.58),
+                        width: 96
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                confirmSubscription()
+            } label: {
+                actionButtonLabel(
+                    title: "Confirm",
+                    textColor: .black.opacity(0.92),
+                    fillColors: [
+                        .white.opacity(0.55),
+                        .white.opacity(0.18)
+                    ],
+                    strokeColor: .white.opacity(0.65),
+                    width: subscriptionToEdit != nil ? 138 : 124
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func actionButtonLabel(
+        title: String,
+        textColor: Color,
+        fillColors: [Color],
+        strokeColor: Color,
+        width: CGFloat
+    ) -> some View {
+        Text(title)
+            .font(AddSubscriptionFont.bodySemibold(18))
+            .foregroundStyle(textColor)
+            .frame(width: width, height: 46)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: fillColors,
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .blendMode(.screen)
+                    }
+                    .overlay {
+                        Capsule()
+                            .stroke(strokeColor, lineWidth: 0.8)
+                    }
+                    .shadow(color: .white.opacity(0.45), radius: 8, y: -1)
+                    .shadow(color: .black.opacity(0.08), radius: 18, y: 10)
+            }
+    }
+
+    private static func formattedAmountText(for amount: Double?) -> String {
+        guard let amount else { return "" }
+        return amount.formatted(.number.precision(.fractionLength(0...2)))
     }
 }
 
@@ -254,15 +315,9 @@ private struct FrequencyPickerSheet: View {
                             dismiss()
                         } label: {
                             HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(frequency.displayName)
-                                        .font(AddSubscriptionFont.bodySemibold(17))
-                                        .foregroundStyle(.black.opacity(0.9))
-
-                                    Text(frequency.rawValue.uppercased())
-                                        .font(AddSubscriptionFont.body(14))
-                                        .foregroundStyle(Color.formPlaceholder)
-                                }
+                                Text(frequency.displayName)
+                                    .font(AddSubscriptionFont.bodySemibold(17))
+                                    .foregroundStyle(.black.opacity(0.9))
 
                                 Spacer()
 
@@ -313,10 +368,12 @@ private struct UnderlineDatePickerField: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Color.formPlaceholder)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Rectangle()
                 .fill(Color.formDivider)
@@ -349,10 +406,12 @@ private struct UnderlinePickerField: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.formPlaceholder)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Rectangle()
                 .fill(Color.formDivider)
@@ -418,6 +477,10 @@ private struct UnderlineInputField: View {
                 .fill(Color.formDivider)
                 .frame(height: 1)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusedField.wrappedValue = field
+        }
     }
 
     private var placeholder: Text {
@@ -436,26 +499,23 @@ private enum AddSubscriptionDateFormatter {
     }()
 }
 
-private struct SubscriptionPickerSheet: View {
-    @Binding var selectedName: String
+private struct CategoryPickerSheet: View {
+    @Binding var selectedCategory: Subscription.Category?
+    @Binding var selectedRecurringPayment: String
     @Environment(\.dismiss) private var dismiss
-    @State private var searchText = ""
 
     var body: some View {
         NavigationStack {
-            List(filteredSubscriptions, id: \.id) { subscription in
-                Button {
-                    selectedName = subscription.name
-                    dismiss()
-                } label: {
+            List(Subscription.Category.allCases) { category in
+                NavigationLink(value: category) {
                     HStack {
-                        Text(subscription.name)
+                        Text(category.rawValue)
                             .font(AddSubscriptionFont.body(17))
                             .foregroundStyle(.primary)
 
                         Spacer()
 
-                        if selectedName == subscription.name {
+                        if selectedCategory == category {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18))
                                 .foregroundStyle(.black)
@@ -463,24 +523,246 @@ private struct SubscriptionPickerSheet: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .buttonStyle(.plain)
                 .listRowBackground(Color.white.opacity(0.38))
             }
             .scrollContentBackground(.hidden)
             .background(Color.clear)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search subscriptions")
-            .navigationTitle("Choose Subscription")
+            .navigationTitle("Choose Category")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Subscription.Category.self) { category in
+                RecurringPaymentPickerSheet(
+                    category: category,
+                    selectedCategory: $selectedCategory,
+                    selectedRecurringPayment: $selectedRecurringPayment,
+                    dismissPicker: {
+                        dismiss()
+                    }
+                )
+            }
+        }
+    }
+}
+
+private struct RecurringPaymentPickerSheet: View {
+    let category: Subscription.Category
+    @Binding var selectedCategory: Subscription.Category?
+    @Binding var selectedRecurringPayment: String
+    let dismissPicker: () -> Void
+    @State private var searchText = ""
+
+    var body: some View {
+        List(filteredItems, id: \.self) { item in
+            if category == .other && item == "Custom entry" {
+                NavigationLink {
+                    CustomRecurringPaymentEntryView(
+                        selectedCategory: $selectedCategory,
+                        selectedRecurringPayment: $selectedRecurringPayment,
+                        dismissPicker: dismissPicker
+                    )
+                } label: {
+                    rowLabel(for: item)
+                }
+                .listRowBackground(Color.white.opacity(0.38))
+            } else {
+                Button {
+                    selectedCategory = category
+                    selectedRecurringPayment = item
+                    dismissPicker()
+                } label: {
+                    rowLabel(for: item)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.white.opacity(0.38))
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .navigationTitle(category.rawValue)
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: category == .subscriptions ? "Search subscriptions" : "Search recurring payments"
+        )
+    }
+
+    private var filteredItems: [String] {
+        let items = category.items
+        let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedSearchText.isEmpty else { return items }
+
+        return items.filter {
+            $0.localizedCaseInsensitiveContains(trimmedSearchText)
         }
     }
 
-    private var filteredSubscriptions: [Subscription] {
-        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return Subscription.subscriptionsList
+    @ViewBuilder
+    private func rowLabel(for item: String) -> some View {
+        HStack {
+            RecurringPaymentIconView(iconName: Subscription.iconName(for: item))
+
+            Text(item)
+                .font(AddSubscriptionFont.body(17))
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            if selectedCategory == category && selectedRecurringPayment == item {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.black)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct RecurringPaymentIconView: View {
+    let iconName: String?
+
+    var body: some View {
+        Group {
+            if let emojiIcon {
+                Text(emojiIcon)
+                    .font(.system(size: 18))
+                    .frame(width: PickerIconMetrics.symbolSide, height: PickerIconMetrics.symbolSide)
+            } else if let iconImage {
+                iconImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: PickerIconMetrics.symbolSide, height: PickerIconMetrics.symbolSide)
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: PickerIconMetrics.symbolSide, height: PickerIconMetrics.symbolSide)
+                    .foregroundStyle(Color.primary.opacity(0.7))
+            }
+        }
+        .frame(width: PickerIconMetrics.containerWidth, alignment: .center)
+    }
+
+    private var emojiIcon: String? {
+        guard let iconName, !iconName.isEmpty else { return nil }
+        guard UIImage(systemName: iconName) == nil else { return nil }
+        guard bundledIcon(named: iconName) == nil else { return nil }
+        guard UIImage(named: iconName) == nil else { return nil }
+        return iconName
+    }
+
+    private var iconImage: Image? {
+        guard let iconName, !iconName.isEmpty else { return nil }
+
+        if let bundledImage = bundledIcon(named: iconName) {
+            return Image(uiImage: bundledImage)
         }
 
-        return Subscription.subscriptionsList.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText)
+        if UIImage(named: iconName) != nil {
+            return Image(iconName)
+        }
+
+        if UIImage(systemName: iconName) != nil {
+            return Image(systemName: iconName)
+        }
+
+        return nil
+    }
+
+    private func bundledIcon(named iconName: String) -> UIImage? {
+        let nsIconName = iconName as NSString
+        let resourceName = nsIconName.deletingPathExtension
+        let resourceExtension = nsIconName.pathExtension.isEmpty ? nil : nsIconName.pathExtension
+
+        if let image = UIImage(named: "Icons/\(iconName)") {
+            return image
+        }
+
+        if let image = UIImage(named: iconName) {
+            return image
+        }
+
+        let candidateURLs = [
+            Bundle.main.url(
+                forResource: resourceName,
+                withExtension: resourceExtension,
+                subdirectory: "Icons"
+            ),
+            Bundle.main.url(
+                forResource: resourceName,
+                withExtension: resourceExtension
+            )
+        ]
+
+        for candidateURL in candidateURLs {
+            guard let url = candidateURL else { continue }
+            guard let data = try? Data(contentsOf: url) else { continue }
+            guard let image = UIImage(data: data) else { continue }
+            return image
+        }
+
+        return nil
+    }
+}
+
+private enum PickerIconMetrics {
+    static let symbolSide: CGFloat = 18
+    static let containerWidth: CGFloat = 26
+}
+
+private struct CustomRecurringPaymentEntryView: View {
+    @Binding var selectedCategory: Subscription.Category?
+    @Binding var selectedRecurringPayment: String
+    let dismissPicker: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var customEntry = ""
+    @FocusState private var isTextFieldFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 20) {
+            TextField("Custom entry", text: $customEntry)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .focused($isTextFieldFocused)
+                .font(AddSubscriptionFont.body(18))
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(.white.opacity(0.6))
+                )
+
+            Button {
+                let trimmedEntry = customEntry.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedEntry.isEmpty else { return }
+
+                selectedCategory = .other
+                selectedRecurringPayment = trimmedEntry
+                dismiss()
+                dismissPicker()
+            } label: {
+                Text("Use Custom Entry")
+                    .font(AddSubscriptionFont.bodySemibold(17))
+                    .foregroundStyle(.black.opacity(0.9))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(.white.opacity(0.7))
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(customEntry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(customEntry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 24)
+        .navigationTitle("Custom entry")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            isTextFieldFocused = true
         }
     }
 }
@@ -523,7 +805,6 @@ private extension Color {
     static let addSubscriptionBackground = Color(red: 253 / 255, green: 221 / 255, blue: 197 / 255)
     static let formDivider = Color.black.opacity(0.12)
     static let formPlaceholder = Color.black.opacity(0.22)
-    static let summaryCard = Color(red: 220 / 255, green: 219 / 255, blue: 210 / 255)
 }
 
 struct AddSubscriptionPage_Previews: PreviewProvider {
