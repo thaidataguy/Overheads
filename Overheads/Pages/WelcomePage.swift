@@ -3,21 +3,21 @@ import UIKit
 
 struct WelcomePage: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showsCurrencyPicker = false
     @State private var showsAddSubscriptionPage = false
     @State private var showsFirstAddSubscriptionTitle = false
 
     var body: some View {
         ZStack {
-            Color.welcomeBackground
-                .ignoresSafeArea()
+            OverheadsScreenBackground(palette: palette)
 
             VStack(spacing: 0) {
                 Spacer(minLength: 120)
 
                 Text("Welcome to\nOverheads.")
                     .font(WelcomeFont.extraBold(40))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(palette.primaryText)
                     .multilineTextAlignment(.center)
                     .lineSpacing(10)
 
@@ -25,7 +25,7 @@ struct WelcomePage: View {
 
                 Text("Nothing forgotten.\nNothing unexpected.")
                     .font(WelcomeFont.regular(32))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(palette.secondaryText)
                     .multilineTextAlignment(.center)
                     .lineSpacing(12)
 
@@ -33,7 +33,7 @@ struct WelcomePage: View {
 
                 Text("Know before you’re charged.")
                     .font(WelcomeFont.medium(24))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(palette.mutedText)
                     .multilineTextAlignment(.center)
 
                 Spacer()
@@ -46,32 +46,14 @@ struct WelcomePage: View {
             } label: {
                 Text(buttonTitle)
                     .font(.system(size: 16, weight: .medium, design: .default))
-                    .foregroundStyle(.black.opacity(0.88))
+                    .foregroundStyle(palette.actionTextOnAccent)
                     .padding(.horizontal, 22)
                     .frame(height: 38)
                     .background {
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                .white.opacity(0.55),
-                                                .white.opacity(0.18)
-                                            ],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    .blendMode(.screen)
-                            }
-                            .overlay {
-                                Capsule()
-                                    .stroke(.white.opacity(0.65), lineWidth: 0.8)
-                            }
-                            .shadow(color: .white.opacity(0.45), radius: 8, y: -1)
-                            .shadow(color: .black.opacity(0.08), radius: 18, y: 10)
+                        OverheadsCapsuleBackground(
+                            palette: palette,
+                            colors: palette.primaryActionColors
+                        )
                     }
             }
             .buttonStyle(.plain)
@@ -82,7 +64,7 @@ struct WelcomePage: View {
                 .presentationDetents([.height(248)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
-                .presentationBackground(.thinMaterial)
+                .presentationBackground(.clear)
         }
         .fullScreenCover(isPresented: $showsAddSubscriptionPage) {
             AddSubscriptionPage(showsFirstTimeTitle: showsFirstAddSubscriptionTitle)
@@ -110,60 +92,80 @@ struct WelcomePage: View {
             set: { subscriptionStore.selectedCurrency = $0 }
         )
     }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
+    }
 }
 
 private struct CurrencyPickerSheet: View {
     @Binding var selectedCurrency: SupportedCurrency?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Select Currency")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
+        ZStack {
+            OverheadsScreenBackground(palette: palette)
 
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(spacing: 12) {
-                    ForEach(SupportedCurrency.allCases) { currency in
-                        Button {
-                            selectedCurrency = currency
-                            dismiss()
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("\(currency.name) (\(currency.symbol))")
-                                        .font(.system(size: 17, weight: .semibold))
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Select Currency")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.primaryText)
 
-                                    Text(currency.detail)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.secondary)
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(spacing: 12) {
+                        ForEach(SupportedCurrency.allCases) { currency in
+                            Button {
+                                selectedCurrency = currency
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("\(currency.name) (\(currency.symbol))")
+                                            .font(.system(size: 17, weight: .semibold))
+
+                                        Text(currency.detail)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(palette.secondaryText)
+                                    }
+
+                                    Spacer()
+
+                                    if selectedCurrency == currency {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(palette.sun)
+                                    }
                                 }
-
-                                Spacer()
-
-                                if selectedCurrency == currency {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(.black)
+                                .foregroundStyle(palette.primaryText)
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity, minHeight: 58)
+                                .background {
+                                    OverheadsRoundedPanelBackground(
+                                        palette: palette,
+                                        cornerRadius: 18,
+                                        emphasis: selectedCurrency == currency ? 0.9 : 0.6
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .fill(selectedCurrency == currency ? palette.subduedFill : .clear)
+                                    }
                                 }
                             }
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity, minHeight: 58)
-                            .background(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(.white.opacity(selectedCurrency == currency ? 0.88 : 0.56))
-                            )
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 24)
+            .padding(.bottom, 18)
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 24)
-        .padding(.bottom, 18)
+    }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
     }
 }
 
@@ -199,10 +201,6 @@ private enum WelcomeFont {
 
         return fallback
     }
-}
-
-private extension Color {
-    static let welcomeBackground = Color(red: 253 / 255, green: 221 / 255, blue: 197 / 255)
 }
 
 struct WelcomePage_Previews: PreviewProvider {

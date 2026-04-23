@@ -10,73 +10,46 @@ import UIKit
 
 struct HomePage: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var showsAddSubscriptionPage = false
+    @State private var showsSettingsPage = false
     @State private var selectedSubscriptionToEdit: Subscription?
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Color.homeBackground
-                .ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            OverheadsScreenBackground(palette: palette)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 24) {
                     headerSection
-                        .padding(.top, 58)
+                        .padding(.top, 30)
                         .padding(.horizontal, 30)
 
                     subscriptionListSection
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 140)
+                        .padding(.bottom, 132)
                 }
             }
 
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Button {
-                showsAddSubscriptionPage = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .regular))
-                    .foregroundStyle(.black.opacity(0.9))
-                    .frame(width: 78, height: 78)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                .white.opacity(0.7),
-                                                .white.opacity(0.25)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .blendMode(.screen)
-                            }
-                            .overlay {
-                                Circle()
-                                    .stroke(.white.opacity(0.72), lineWidth: 0.9)
-                            }
-                            .shadow(color: .white.opacity(0.5), radius: 10, y: -1)
-                            .shadow(color: .black.opacity(0.08), radius: 22, y: 16)
-                    }
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 26)
-            .padding(.bottom, 42)
+            homeButtons
         }
         .fullScreenCover(isPresented: $showsAddSubscriptionPage) {
             AddSubscriptionPage(showsFirstTimeTitle: false)
+                .environmentObject(subscriptionStore)
+        }
+        .fullScreenCover(isPresented: $showsSettingsPage) {
+            SettingsPage()
                 .environmentObject(subscriptionStore)
         }
         .fullScreenCover(item: $selectedSubscriptionToEdit) { subscription in
             AddSubscriptionPage(showsFirstTimeTitle: false, subscriptionToEdit: subscription)
                 .environmentObject(subscriptionStore)
         }
+    }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
     }
 
     private var currencySymbol: String {
@@ -115,37 +88,28 @@ struct HomePage: View {
         VStack(alignment: .center, spacing: 0) {
             Text("Overheads")
                 .font(HomeFont.extraBold(48))
-                .foregroundStyle(.black)
+                .foregroundStyle(palette.primaryText)
 
             Spacer()
-                .frame(height: 30)
+                .frame(height: 10)
 
             HStack(spacing: 10) {
                 Image(systemName: acknowledgementSymbolName)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.black.opacity(0.78))
+                    .foregroundStyle(palette.cream.opacity(0.96))
 
                 Text(acknowledgementText)
                     .font(HomeFont.body(15))
-                    .foregroundStyle(.black.opacity(0.86))
+                    .foregroundStyle(palette.cream.opacity(0.96))
             }
             .padding(.horizontal, 24)
             .frame(height: 44)
             .background {
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: acknowledgementStatusColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(.white.opacity(0.52), lineWidth: 0.8)
-                    }
-                    .shadow(color: .white.opacity(0.42), radius: 8, y: -1)
-                    .shadow(color: acknowledgementStatusShadowColor, radius: 24, y: 14)
+                OverheadsCapsuleBackground(
+                    palette: palette,
+                    colors: acknowledgementStatusColors
+                )
+                .shadow(color: acknowledgementStatusShadowColor, radius: 26, y: 14)
             }
 
             Spacer()
@@ -154,20 +118,20 @@ struct HomePage: View {
             VStack(spacing: 10) {
                 Text("\(currencySymbol)\(formattedAmount(monthlyTotal))/month")
                     .font(HomeFont.medium(40))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(palette.primaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.9)
 
                 HStack {
                     Text("\(currencySymbol)\(formattedAmount(dailyTotal))/day")
                         .font(HomeFont.body(15))
-                        .foregroundStyle(.black.opacity(0.8))
+                        .foregroundStyle(palette.secondaryText)
 
                     Spacer()
 
                     Text("\(currencySymbol)\(formattedAmount(yearlyTotal))/year")
                         .font(HomeFont.body(15))
-                        .foregroundStyle(.black.opacity(0.8))
+                        .foregroundStyle(palette.secondaryText)
                 }
                 .frame(maxWidth: 255)
             }
@@ -175,35 +139,18 @@ struct HomePage: View {
             .padding(.vertical, 22)
             .frame(maxWidth: .infinity)
             .background {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(0.72),
-                                        .white.opacity(0.26)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .blendMode(.screen)
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .stroke(.white.opacity(0.72), lineWidth: 0.9)
-                    }
-                    .shadow(color: .white.opacity(0.5), radius: 10, y: -1)
-                    .shadow(color: .black.opacity(0.08), radius: 22, y: 16)
-                }
+                OverheadsRoundedPanelBackground(
+                    palette: palette,
+                    cornerRadius: 34,
+                    emphasis: 1.1
+                )
+            }
             .padding(.horizontal, 2)
         }
     }
 
     private var subscriptionListSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 8) {
             ForEach(sortedSavedSubscriptions) { subscription in
                 SubscriptionRowView(
                     subscription: subscription,
@@ -218,6 +165,48 @@ struct HomePage: View {
                 }
             }
         }
+    }
+
+    private var homeButtons: some View {
+        HStack(spacing: 16) {
+            homeButton(
+                systemName: "gearshape.fill",
+                colors: palette.secondaryActionColors
+            ) {
+                showsSettingsPage = true
+            }
+
+            Spacer(minLength: 0)
+
+            homeButton(
+                systemName: "plus",
+                colors: palette.primaryActionColors
+            ) {
+                showsAddSubscriptionPage = true
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 34)
+    }
+
+    private func homeButton(
+        systemName: String,
+        colors: [Color],
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(palette.actionTextOnAccent)
+                .frame(width: 68, height: 68)
+                .background {
+                    OverheadsCircleBackground(
+                        palette: palette,
+                        colors: colors
+                    )
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var sortedSavedSubscriptions: [Subscription] {
@@ -248,20 +237,14 @@ struct HomePage: View {
 
     private var acknowledgementStatusColors: [Color] {
         if upcomingUnacknowledgedCount == 0 {
-            return [
-                Color(red: 0.60, green: 0.89, blue: 0.49),
-                Color(red: 0.44, green: 0.80, blue: 0.39)
-            ]
+            return palette.settledStatusColors
         }
 
-        return [
-            Color(red: 1.0, green: 0.96, blue: 0.38),
-            Color(red: 1.0, green: 0.93, blue: 0.28)
-        ]
+        return palette.attentionStatusColors
     }
 
     private var acknowledgementStatusShadowColor: Color {
-        upcomingUnacknowledgedCount == 0 ? .green.opacity(0.22) : .orange.opacity(0.22)
+        upcomingUnacknowledgedCount == 0 ? palette.sea.opacity(0.26) : palette.sun.opacity(0.24)
     }
 
     private func monthlyEquivalent(for amount: Double, frequency: Frequency) -> Double {
@@ -318,10 +301,6 @@ private enum HomeFont {
 
         return fallback
     }
-}
-
-private extension Color {
-    static let homeBackground = Color(red: 253 / 255, green: 221 / 255, blue: 197 / 255)
 }
 
 struct HomePage_Previews: PreviewProvider {

@@ -11,19 +11,21 @@ import UIKit
 struct AddSubscriptionPage: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     enum Field: Hashable {
+        case name
         case amount
     }
 
     let showsFirstTimeTitle: Bool
     let subscriptionToEdit: Subscription?
-    @State private var selectedRecurringPayment = ""
-    @State private var selectedCategory: Subscription.Category?
+    @State private var name = ""
+    @State private var uploadedIconData: Data?
+    @State private var selectedIconScale = 1.0
     @State private var amount = ""
     @State private var selectedFrequency: Frequency?
     @State private var nextChargeDate = Date()
     @State private var hasSelectedNextChargeDate = false
-    @State private var showsCategoryPicker = false
     @State private var showsFrequencyPicker = false
     @State private var showsNextChargeDatePicker = false
     @State private var showsIncompleteDataAlert = false
@@ -32,8 +34,9 @@ struct AddSubscriptionPage: View {
     init(showsFirstTimeTitle: Bool, subscriptionToEdit: Subscription? = nil) {
         self.showsFirstTimeTitle = showsFirstTimeTitle
         self.subscriptionToEdit = subscriptionToEdit
-        _selectedRecurringPayment = State(initialValue: subscriptionToEdit?.name ?? "")
-        _selectedCategory = State(initialValue: subscriptionToEdit.flatMap { Subscription.category(for: $0.name) })
+        _name = State(initialValue: subscriptionToEdit?.name ?? "")
+        _uploadedIconData = State(initialValue: subscriptionToEdit?.iconCustomization?.uploadedImageData)
+        _selectedIconScale = State(initialValue: subscriptionToEdit?.iconCustomization?.scale ?? 1.0)
         _amount = State(initialValue: Self.formattedAmountText(for: subscriptionToEdit?.amount))
         _selectedFrequency = State(initialValue: subscriptionToEdit?.frequency)
         _nextChargeDate = State(initialValue: subscriptionToEdit?.nextChargeDate ?? Date())
@@ -42,79 +45,87 @@ struct AddSubscriptionPage: View {
 
     var body: some View {
         ZStack {
-            Color.addSubscriptionBackground
-                .ignoresSafeArea()
+            OverheadsScreenBackground(palette: palette)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     focusedField = nil
                 }
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 148)
+            VStack {
+                Spacer(minLength: 0)
 
-                Text(pageTitle)
-                    .font(AddSubscriptionFont.title(34))
-                    .foregroundStyle(.black)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(spacing: 28) {
+                    Text(pageTitle)
+                        .font(AddSubscriptionFont.title(34))
+                        .foregroundStyle(palette.primaryText)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 52)
+                    IconCustomizationCard(uploadedImageData: $uploadedIconData, scale: $selectedIconScale)
+                        .padding(.horizontal, 12)
 
-                VStack(spacing: 16) {
-                    UnderlinePickerField(
-                        title: "Category",
-                        selectedValue: categoryFieldValue,
-                        action: {
-                            focusedField = nil
-                            showsCategoryPicker = true
-                        }
-                    )
-                    UnderlineInputField(title: "Amount", text: $amount, field: .amount, focusedField: $focusedField)
-                    UnderlinePickerField(
-                        title: "Frequency",
-                        selectedValue: selectedFrequency?.displayName ?? "",
-                        action: {
-                            focusedField = nil
-                            showsFrequencyPicker = true
-                        }
-                    )
-                    UnderlineDatePickerField(
-                        title: "Next Charge Date",
-                        date: $nextChargeDate,
-                        hasSelectedDate: $hasSelectedNextChargeDate,
-                        action: {
-                            focusedField = nil
-                            showsNextChargeDatePicker = true
-                        }
+                    VStack(spacing: 16) {
+                        UnderlineInputField(
+                            title: "Name",
+                            text: $name,
+                            field: .name,
+                            focusedField: $focusedField,
+                            keyboardType: .default,
+                            textInputAutocapitalization: .words
+                        )
+                        UnderlineInputField(
+                            title: "Amount",
+                            text: $amount,
+                            field: .amount,
+                            focusedField: $focusedField,
+                            keyboardType: .decimalPad,
+                            textInputAutocapitalization: .never
+                        )
+                        UnderlinePickerField(
+                            title: "Frequency",
+                            selectedValue: selectedFrequency?.displayName ?? "",
+                            action: {
+                                focusedField = nil
+                                showsFrequencyPicker = true
+                            }
+                        )
+                        UnderlineDatePickerField(
+                            title: "Next Charge Date",
+                            date: $nextChargeDate,
+                            hasSelectedDate: $hasSelectedNextChargeDate,
+                            action: {
+                                focusedField = nil
+                                showsNextChargeDatePicker = true
+                            }
+                        )
+                    }
+                    .padding(.horizontal, 38)
+
+                    actionButtons
+                        .padding(.top, 12)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 30)
+                .background {
+                    OverheadsRoundedPanelBackground(
+                        palette: palette,
+                        cornerRadius: 36,
+                        emphasis: 1.05
                     )
                 }
-                .padding(.horizontal, 38)
+                .padding(.horizontal, 20)
 
-                Spacer(minLength: 72)
-
-                actionButtons
-
-                Spacer(minLength: 148)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 20)
-        }
-        .sheet(isPresented: $showsCategoryPicker) {
-            CategoryPickerSheet(
-                selectedCategory: $selectedCategory,
-                selectedRecurringPayment: $selectedRecurringPayment
-            )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
-                .presentationBackground(.thinMaterial)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .sheet(isPresented: $showsFrequencyPicker) {
             FrequencyPickerSheet(selectedFrequency: $selectedFrequency)
                 .presentationDetents([.height(340)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
-                .presentationBackground(.thinMaterial)
+                .presentationBackground(.clear)
         }
         .sheet(isPresented: $showsNextChargeDatePicker) {
             NextChargeDatePickerSheet(
@@ -124,7 +135,7 @@ struct AddSubscriptionPage: View {
             .presentationDetents([.height(440)])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
-            .presentationBackground(.thinMaterial)
+            .presentationBackground(.clear)
         }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -134,6 +145,7 @@ struct AddSubscriptionPage: View {
                     focusedField = nil
                 }
                 .font(AddSubscriptionFont.bodySemibold(16))
+                .foregroundStyle(palette.primaryText)
             }
         }
         .alert("Data field is incomplete", isPresented: $showsIncompleteDataAlert) {
@@ -159,7 +171,7 @@ struct AddSubscriptionPage: View {
         focusedField = nil
 
         guard
-            !selectedRecurringPayment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             let parsedAmount = parsedAmount,
             let selectedFrequency,
             hasSelectedNextChargeDate
@@ -171,14 +183,16 @@ struct AddSubscriptionPage: View {
         if let subscriptionToEdit {
             subscriptionStore.updateSubscription(
                 id: subscriptionToEdit.id,
-                name: selectedRecurringPayment,
+                name: name,
+                iconCustomization: effectiveIconCustomization,
                 amount: parsedAmount,
                 frequency: selectedFrequency,
                 nextChargeDate: nextChargeDate
             )
         } else {
             subscriptionStore.addSubscription(
-                name: selectedRecurringPayment,
+                name: name,
+                iconCustomization: effectiveIconCustomization,
                 amount: parsedAmount,
                 frequency: selectedFrequency,
                 nextChargeDate: nextChargeDate
@@ -202,8 +216,17 @@ struct AddSubscriptionPage: View {
         return Double(normalizedAmount)
     }
 
-    private var categoryFieldValue: String {
-        selectedRecurringPayment
+    private var effectiveIconCustomization: Subscription.IconCustomization? {
+        let customization = Subscription.IconCustomization(
+            uploadedImageData: uploadedIconData,
+            scale: selectedIconScale
+        )
+
+        return customization.isModified ? customization : nil
+    }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
     }
 
     private var actionButtons: some View {
@@ -214,12 +237,8 @@ struct AddSubscriptionPage: View {
                 } label: {
                     actionButtonLabel(
                         title: "Delete",
-                        textColor: .white,
-                        fillColors: [
-                            Color(red: 0.89, green: 0.24, blue: 0.21).opacity(0.92),
-                            Color(red: 0.76, green: 0.16, blue: 0.16).opacity(0.84)
-                        ],
-                        strokeColor: .white.opacity(0.38),
+                        textColor: palette.actionTextOnAccent,
+                        fillColors: palette.destructiveActionColors,
                         width: 138
                     )
                 }
@@ -230,12 +249,8 @@ struct AddSubscriptionPage: View {
                 } label: {
                     actionButtonLabel(
                         title: "Back",
-                        textColor: .black.opacity(0.82),
-                        fillColors: [
-                            .white.opacity(0.45),
-                            .white.opacity(0.16)
-                        ],
-                        strokeColor: .white.opacity(0.58),
+                        textColor: palette.actionTextOnSecondary,
+                        fillColors: palette.secondaryActionColors,
                         width: 96
                     )
                 }
@@ -247,12 +262,8 @@ struct AddSubscriptionPage: View {
             } label: {
                 actionButtonLabel(
                     title: "Confirm",
-                    textColor: .black.opacity(0.92),
-                    fillColors: [
-                        .white.opacity(0.55),
-                        .white.opacity(0.18)
-                    ],
-                    strokeColor: .white.opacity(0.65),
+                    textColor: palette.actionTextOnAccent,
+                    fillColors: palette.primaryActionColors,
                     width: subscriptionToEdit != nil ? 138 : 124
                 )
             }
@@ -265,7 +276,6 @@ struct AddSubscriptionPage: View {
         title: String,
         textColor: Color,
         fillColors: [Color],
-        strokeColor: Color,
         width: CGFloat
     ) -> some View {
         Text(title)
@@ -273,25 +283,10 @@ struct AddSubscriptionPage: View {
             .foregroundStyle(textColor)
             .frame(width: width, height: 46)
             .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: fillColors,
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .blendMode(.screen)
-                    }
-                    .overlay {
-                        Capsule()
-                            .stroke(strokeColor, lineWidth: 0.8)
-                    }
-                    .shadow(color: .white.opacity(0.45), radius: 8, y: -1)
-                    .shadow(color: .black.opacity(0.08), radius: 18, y: 10)
+                OverheadsCapsuleBackground(
+                    palette: palette,
+                    colors: fillColors
+                )
             }
     }
 
@@ -304,51 +299,68 @@ struct AddSubscriptionPage: View {
 private struct FrequencyPickerSheet: View {
     @Binding var selectedFrequency: Frequency?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 10) {
-                    ForEach(Frequency.allCases) { frequency in
-                        Button {
-                            selectedFrequency = frequency
-                            dismiss()
-                        } label: {
-                            HStack(spacing: 12) {
-                                Text(frequency.displayName)
-                                    .font(AddSubscriptionFont.bodySemibold(17))
-                                    .foregroundStyle(.black.opacity(0.9))
+            ZStack {
+                OverheadsScreenBackground(palette: palette)
 
-                                Spacer()
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach(Frequency.allCases) { frequency in
+                            Button {
+                                selectedFrequency = frequency
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text(frequency.displayName)
+                                        .font(AddSubscriptionFont.bodySemibold(17))
+                                        .foregroundStyle(palette.primaryText)
 
-                                if selectedFrequency == frequency {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(.black.opacity(0.75))
+                                    Spacer()
+
+                                    if selectedFrequency == frequency {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(palette.sun)
+                                    }
+                                }
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background {
+                                    OverheadsRoundedPanelBackground(
+                                        palette: palette,
+                                        cornerRadius: 22,
+                                        emphasis: selectedFrequency == frequency ? 0.9 : 0.6
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                            .fill(selectedFrequency == frequency ? palette.subduedFill : .clear)
+                                    }
                                 }
                             }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 16)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                    .fill(.white.opacity(0.6))
-                            )
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 28)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 28)
             }
             .navigationTitle("Select Frequency")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
+    }
 }
 
 private struct UnderlineDatePickerField: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     @Binding var date: Date
     @Binding var hasSelectedDate: Bool
@@ -360,13 +372,13 @@ private struct UnderlineDatePickerField: View {
                 HStack(spacing: 10) {
                     Text(displayText)
                         .font(AddSubscriptionFont.body(18))
-                        .foregroundStyle(hasSelectedDate ? .black.opacity(0.9) : Color.formPlaceholder)
+                        .foregroundStyle(hasSelectedDate ? palette.primaryText : palette.placeholderText)
 
                     Spacer()
 
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.formPlaceholder)
+                        .foregroundStyle(palette.placeholderText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
@@ -376,7 +388,7 @@ private struct UnderlineDatePickerField: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Rectangle()
-                .fill(Color.formDivider)
+                .fill(palette.divider)
                 .frame(height: 1)
         }
     }
@@ -385,9 +397,14 @@ private struct UnderlineDatePickerField: View {
         guard hasSelectedDate else { return title }
         return AddSubscriptionDateFormatter.display.string(from: date)
     }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
+    }
 }
 
 private struct UnderlinePickerField: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let selectedValue: String
     let action: () -> Void
@@ -398,13 +415,13 @@ private struct UnderlinePickerField: View {
                 HStack(spacing: 10) {
                     Text(displayText)
                         .font(AddSubscriptionFont.body(18))
-                        .foregroundStyle(selectedValue.isEmpty ? Color.formPlaceholder : .black.opacity(0.9))
+                        .foregroundStyle(selectedValue.isEmpty ? palette.placeholderText : palette.primaryText)
 
                     Spacer()
 
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.formPlaceholder)
+                        .foregroundStyle(palette.placeholderText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
@@ -414,7 +431,7 @@ private struct UnderlinePickerField: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Rectangle()
-                .fill(Color.formDivider)
+                .fill(palette.divider)
                 .frame(height: 1)
         }
     }
@@ -422,27 +439,37 @@ private struct UnderlinePickerField: View {
     private var displayText: String {
         selectedValue.isEmpty ? title : selectedValue
     }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
+    }
 }
 
 private struct NextChargeDatePickerSheet: View {
     @Binding var selectedDate: Date
     @Binding var hasSelectedDate: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var hasDismissedAfterSelection = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                DatePicker(
-                    "Next Charge Date",
-                    selection: $selectedDate,
-                    displayedComponents: [.date]
-                )
-                .datePickerStyle(.graphical)
-                .labelsHidden()
+            ZStack {
+                OverheadsScreenBackground(palette: palette)
+
+                VStack(spacing: 20) {
+                    DatePicker(
+                        "Next Charge Date",
+                        selection: $selectedDate,
+                        displayedComponents: [.date]
+                    )
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                    .tint(palette.sun)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
             .navigationTitle("Select Date")
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: selectedDate) { _, _ in
@@ -454,27 +481,34 @@ private struct NextChargeDatePickerSheet: View {
             }
         }
     }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
+    }
 }
 
 private struct UnderlineInputField: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     @Binding var text: String
     let field: AddSubscriptionPage.Field
     var focusedField: FocusState<AddSubscriptionPage.Field?>.Binding
+    let keyboardType: UIKeyboardType
+    let textInputAutocapitalization: TextInputAutocapitalization
 
     var body: some View {
         VStack(spacing: 0) {
             TextField("", text: $text, prompt: placeholder)
-                .textInputAutocapitalization(.never)
+                .textInputAutocapitalization(textInputAutocapitalization)
                 .autocorrectionDisabled()
-                .keyboardType(.decimalPad)
+                .keyboardType(keyboardType)
                 .focused(focusedField, equals: field)
                 .font(AddSubscriptionFont.body(18))
-                .foregroundStyle(.black.opacity(0.9))
+                .foregroundStyle(palette.primaryText)
                 .padding(.bottom, 10)
 
             Rectangle()
-                .fill(Color.formDivider)
+                .fill(palette.divider)
                 .frame(height: 1)
         }
         .contentShape(Rectangle())
@@ -486,7 +520,11 @@ private struct UnderlineInputField: View {
     private var placeholder: Text {
         Text(title)
             .font(AddSubscriptionFont.body(18))
-            .foregroundStyle(Color.formPlaceholder)
+            .foregroundStyle(palette.placeholderText)
+    }
+
+    private var palette: OverheadsTheme {
+        OverheadsTheme.resolve(for: colorScheme)
     }
 }
 
@@ -499,275 +537,7 @@ private enum AddSubscriptionDateFormatter {
     }()
 }
 
-private struct CategoryPickerSheet: View {
-    @Binding var selectedCategory: Subscription.Category?
-    @Binding var selectedRecurringPayment: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List(Subscription.Category.allCases) { category in
-                NavigationLink(value: category) {
-                    HStack {
-                        Text(category.rawValue)
-                            .font(AddSubscriptionFont.body(17))
-                            .foregroundStyle(.primary)
-
-                        Spacer()
-
-                        if selectedCategory == category {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundStyle(.black)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .listRowBackground(Color.white.opacity(0.38))
-            }
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .navigationTitle("Choose Category")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: Subscription.Category.self) { category in
-                RecurringPaymentPickerSheet(
-                    category: category,
-                    selectedCategory: $selectedCategory,
-                    selectedRecurringPayment: $selectedRecurringPayment,
-                    dismissPicker: {
-                        dismiss()
-                    }
-                )
-            }
-        }
-    }
-}
-
-private struct RecurringPaymentPickerSheet: View {
-    let category: Subscription.Category
-    @Binding var selectedCategory: Subscription.Category?
-    @Binding var selectedRecurringPayment: String
-    let dismissPicker: () -> Void
-    @State private var searchText = ""
-
-    var body: some View {
-        List(filteredItems, id: \.self) { item in
-            if category == .other && item == "Custom entry" {
-                NavigationLink {
-                    CustomRecurringPaymentEntryView(
-                        selectedCategory: $selectedCategory,
-                        selectedRecurringPayment: $selectedRecurringPayment,
-                        dismissPicker: dismissPicker
-                    )
-                } label: {
-                    rowLabel(for: item)
-                }
-                .listRowBackground(Color.white.opacity(0.38))
-            } else {
-                Button {
-                    selectedCategory = category
-                    selectedRecurringPayment = item
-                    dismissPicker()
-                } label: {
-                    rowLabel(for: item)
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(Color.white.opacity(0.38))
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
-        .navigationTitle(category.rawValue)
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: category == .subscriptions ? "Search subscriptions" : "Search recurring payments"
-        )
-    }
-
-    private var filteredItems: [String] {
-        let items = category.items
-        let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedSearchText.isEmpty else { return items }
-
-        return items.filter {
-            $0.localizedCaseInsensitiveContains(trimmedSearchText)
-        }
-    }
-
-    @ViewBuilder
-    private func rowLabel(for item: String) -> some View {
-        HStack {
-            RecurringPaymentIconView(iconName: Subscription.iconName(for: item))
-
-            Text(item)
-                .font(AddSubscriptionFont.body(17))
-                .foregroundStyle(.primary)
-
-            Spacer()
-
-            if selectedCategory == category && selectedRecurringPayment == item {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.black)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-private struct RecurringPaymentIconView: View {
-    let iconName: String?
-
-    var body: some View {
-        Group {
-            if let emojiIcon {
-                Text(emojiIcon)
-                    .font(.system(size: 18))
-                    .frame(width: PickerIconMetrics.symbolSide, height: PickerIconMetrics.symbolSide)
-            } else if let iconImage {
-                iconImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: PickerIconMetrics.symbolSide, height: PickerIconMetrics.symbolSide)
-            } else {
-                Image(systemName: "app.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: PickerIconMetrics.symbolSide, height: PickerIconMetrics.symbolSide)
-                    .foregroundStyle(Color.primary.opacity(0.7))
-            }
-        }
-        .frame(width: PickerIconMetrics.containerWidth, alignment: .center)
-    }
-
-    private var emojiIcon: String? {
-        guard let iconName, !iconName.isEmpty else { return nil }
-        guard UIImage(systemName: iconName) == nil else { return nil }
-        guard bundledIcon(named: iconName) == nil else { return nil }
-        guard UIImage(named: iconName) == nil else { return nil }
-        return iconName
-    }
-
-    private var iconImage: Image? {
-        guard let iconName, !iconName.isEmpty else { return nil }
-
-        if let bundledImage = bundledIcon(named: iconName) {
-            return Image(uiImage: bundledImage)
-        }
-
-        if UIImage(named: iconName) != nil {
-            return Image(iconName)
-        }
-
-        if UIImage(systemName: iconName) != nil {
-            return Image(systemName: iconName)
-        }
-
-        return nil
-    }
-
-    private func bundledIcon(named iconName: String) -> UIImage? {
-        let nsIconName = iconName as NSString
-        let resourceName = nsIconName.deletingPathExtension
-        let resourceExtension = nsIconName.pathExtension.isEmpty ? nil : nsIconName.pathExtension
-
-        if let image = UIImage(named: "Icons/\(iconName)") {
-            return image
-        }
-
-        if let image = UIImage(named: iconName) {
-            return image
-        }
-
-        let candidateURLs = [
-            Bundle.main.url(
-                forResource: resourceName,
-                withExtension: resourceExtension,
-                subdirectory: "Icons"
-            ),
-            Bundle.main.url(
-                forResource: resourceName,
-                withExtension: resourceExtension
-            )
-        ]
-
-        for candidateURL in candidateURLs {
-            guard let url = candidateURL else { continue }
-            guard let data = try? Data(contentsOf: url) else { continue }
-            guard let image = UIImage(data: data) else { continue }
-            return image
-        }
-
-        return nil
-    }
-}
-
-private enum PickerIconMetrics {
-    static let symbolSide: CGFloat = 18
-    static let containerWidth: CGFloat = 26
-}
-
-private struct CustomRecurringPaymentEntryView: View {
-    @Binding var selectedCategory: Subscription.Category?
-    @Binding var selectedRecurringPayment: String
-    let dismissPicker: () -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var customEntry = ""
-    @FocusState private var isTextFieldFocused: Bool
-
-    var body: some View {
-        VStack(spacing: 20) {
-            TextField("Custom entry", text: $customEntry)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .focused($isTextFieldFocused)
-                .font(AddSubscriptionFont.body(18))
-                .padding(.horizontal, 16)
-                .frame(height: 52)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.white.opacity(0.6))
-                )
-
-            Button {
-                let trimmedEntry = customEntry.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedEntry.isEmpty else { return }
-
-                selectedCategory = .other
-                selectedRecurringPayment = trimmedEntry
-                dismiss()
-                dismissPicker()
-            } label: {
-                Text("Use Custom Entry")
-                    .font(AddSubscriptionFont.bodySemibold(17))
-                    .foregroundStyle(.black.opacity(0.9))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(.white.opacity(0.7))
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(customEntry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .opacity(customEntry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
-
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 24)
-        .navigationTitle("Custom entry")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            isTextFieldFocused = true
-        }
-    }
-}
-
-private enum AddSubscriptionFont {
+enum AddSubscriptionFont {
     static func title(_ size: CGFloat) -> Font {
         font(
             names: ["AbhayaLibre-ExtraBold", "Abhaya Libre ExtraBold"],
@@ -799,12 +569,6 @@ private enum AddSubscriptionFont {
 
         return fallback
     }
-}
-
-private extension Color {
-    static let addSubscriptionBackground = Color(red: 253 / 255, green: 221 / 255, blue: 197 / 255)
-    static let formDivider = Color.black.opacity(0.12)
-    static let formPlaceholder = Color.black.opacity(0.22)
 }
 
 struct AddSubscriptionPage_Previews: PreviewProvider {

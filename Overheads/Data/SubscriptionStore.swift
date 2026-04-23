@@ -151,13 +151,14 @@ final class SubscriptionStore: ObservableObject {
 
     func addSubscription(
         name: String,
+        iconCustomization: Subscription.IconCustomization?,
         amount: Double,
         frequency: Frequency,
         nextChargeDate: Date
     ) {
         let subscription = Subscription(
             name: name,
-            icon: Subscription.iconName(for: name),
+            iconCustomization: iconCustomization,
             amount: amount,
             frequency: frequency,
             nextChargeDate: nextChargeDate,
@@ -171,6 +172,7 @@ final class SubscriptionStore: ObservableObject {
     func updateSubscription(
         id: UUID,
         name: String,
+        iconCustomization: Subscription.IconCustomization?,
         amount: Double,
         frequency: Frequency,
         nextChargeDate: Date
@@ -179,7 +181,7 @@ final class SubscriptionStore: ObservableObject {
 
         let previousNextChargeDate = savedSubscriptions[index].nextChargeDate
         savedSubscriptions[index].name = name
-        savedSubscriptions[index].icon = Subscription.iconName(for: name)
+        savedSubscriptions[index].iconCustomization = iconCustomization
         savedSubscriptions[index].amount = amount
         savedSubscriptions[index].frequency = frequency
         savedSubscriptions[index].nextChargeDate = nextChargeDate

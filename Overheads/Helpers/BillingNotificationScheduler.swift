@@ -56,7 +56,13 @@ enum BillingNotificationScheduler {
         )
 
         return occurrences.compactMap { chargeDate in
-            let reminderDate = calendar.date(byAdding: .day, value: -1, to: chargeDate) ?? chargeDate
+            let dayBeforeCharge = calendar.date(byAdding: .day, value: -1, to: chargeDate) ?? chargeDate
+            let reminderDate = calendar.date(
+                bySettingHour: 10,
+                minute: 0,
+                second: 0,
+                of: dayBeforeCharge
+            ) ?? dayBeforeCharge
             guard reminderDate > Date() else { return nil }
 
             let content = UNMutableNotificationContent()
